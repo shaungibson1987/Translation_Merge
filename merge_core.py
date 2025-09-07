@@ -30,11 +30,12 @@ def merge_translations(main_file, translation_files, columns_to_merge, id_column
 
 		if not translation_files:
 			print("[MERGE LOG] No translation files provided.")
-			return None, None
+			return None, None, None
 
 		# Build combined lookup dict from all translation files
 		lookup = {}
 		per_file_col_counts = {}  # {filename: {col: count}}
+		col_mismatches = {}  # {country: [missing_col1, ...]}
 		for tf in translation_files:
 			try:
 				trans_df = pd.read_excel(tf)
@@ -42,9 +43,14 @@ def merge_translations(main_file, translation_files, columns_to_merge, id_column
 				country = os.path.splitext(os.path.basename(tf))[0].split('__')[-1].replace('_translated','').upper()
 				if country not in per_file_col_counts:
 					per_file_col_counts[country] = {}
+				# Detect column mismatches
+				trans_cols_lc = set([c.strip().lower() for c in trans_df.columns])
+				missing_cols = [col for col in columns_to_merge if col.strip().lower() not in trans_cols_lc]
+				if missing_cols:
+					col_mismatches[country] = missing_cols
 				for col in columns_to_merge:
 					col_lc = col.strip().lower()
-					if col_lc in [c.strip().lower() for c in trans_df.columns]:
+					if col_lc in trans_cols_lc:
 						col_actual = [c for c in trans_df.columns if c.strip().lower() == col_lc][0]
 						non_blank = trans_df[trans_df[col_actual].notna() & (trans_df[col_actual].astype(str).str.strip() != '')]
 						per_file_col_counts[country][col] = non_blank.shape[0]
@@ -56,6 +62,7 @@ def merge_translations(main_file, translation_files, columns_to_merge, id_column
 				print(f"[MERGE LOG] ERROR loading translation file {tf}: {e}")
 		# Return this dict for logging
 		merge_stats = per_file_col_counts
+		col_mismatch_stats = col_mismatches
 
 		main_col_map = {c.lower(): c for c in main_df.columns}
 
@@ -87,10 +94,10 @@ def merge_translations(main_file, translation_files, columns_to_merge, id_column
 				main_df[new_col] = merged_col
 			else:
 				main_df.insert(main_df.columns.get_loc(main_col) + 1, new_col, merged_col)
-		return main_df, merge_stats
+		return main_df, merge_stats, col_mismatch_stats
 	except Exception as e:
 		print(f"[MERGE LOG] ERROR in merge_translations: {e}")
-		return None, None
+		return None, None, None
 
 
 def save_merged_excel(df, output_path):

@@ -35,7 +35,6 @@ class TranslationMergeApp:
 		self.status_label = ttk.Label(frame, text="Ready.", foreground="blue")
 		self.status_label.pack(anchor=tk.W, pady=(10,0))
 
-
 		# Columns checklist with scrollbar
 		columns_frame_outer = ttk.LabelFrame(frame, text="Columns to Merge", padding=5)
 		columns_frame_outer.pack(fill=tk.BOTH, expand=True, pady=10)
@@ -53,6 +52,11 @@ class TranslationMergeApp:
 		)
 		canvas.create_window((0, 0), window=self.columns_frame, anchor="nw")
 		canvas.configure(yscrollcommand=scrollbar.set)
+
+		# Option: Rename columns by order
+		self.rename_cols_var = tk.BooleanVar()
+		self.rename_cols_cb = ttk.Checkbutton(frame, text="Rename columns in translation files by order (force match)", variable=self.rename_cols_var)
+		self.rename_cols_cb.pack(anchor=tk.W, pady=(5,0))
 
 		# Merge button
 		self.merge_btn = ttk.Button(frame, text="Merge and Save", command=self.merge_and_save, state=tk.DISABLED)
@@ -118,6 +122,38 @@ class TranslationMergeApp:
 		log_lines.append("\n--- Translation Merge Run ---")
 		log_lines.append(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
 		log_lines.append("")
+
+		# If rename columns by order is checked, confirm and perform renaming
+		if self.rename_cols_var.get():
+			proceed = messagebox.askyesno(
+				"Rename Columns by Order",
+				"This will rename the columns in each translation file to match the main file, by order.\n\n"
+				"This is only safe if the translation files have the same column order as the main file.\n\n"
+				"Are you sure you want to proceed? (A backup of each translation file will be created.)"
+			)
+			if not proceed:
+				self.status_label.config(text="Column renaming cancelled.")
+				return
+			# Perform renaming and backup
+			main_columns = self.columns
+			import shutil
+			backup_dir = os.path.join(os.path.dirname(self.main_file), "backups")
+			os.makedirs(backup_dir, exist_ok=True)
+			for tf in self.translation_files:
+				try:
+					import pandas as pd
+					# Backup original file in backups folder
+					backup_path = os.path.join(backup_dir, os.path.basename(tf) + ".bak")
+					if not os.path.exists(backup_path):
+						shutil.copy2(tf, backup_path)
+					df = pd.read_excel(tf)
+					if len(df.columns) == len(main_columns):
+						df.columns = main_columns
+						df.to_excel(tf, index=False)
+					else:
+						messagebox.showwarning("Column Count Mismatch", f"File {os.path.basename(tf)} not renamed: column count does not match main file.")
+				except Exception as e:
+					messagebox.showerror("Error Renaming Columns", f"Error renaming columns in {os.path.basename(tf)}: {e}")
 		# End time and run time will be added after merge
 		#
 		# File info
@@ -125,8 +161,10 @@ class TranslationMergeApp:
 		log_lines.append(f"Translation files: {', '.join(self.translation_files)}")
 		log_lines.append(f"Number of translation files: {len(self.translation_files)}")
 		log_lines.append("")
-		# Columns merged
-		log_lines.append(f"Columns merged: {', '.join(selected_cols)}")
+		# Columns merged (one per line)
+		log_lines.append("Columns merged:")
+		for col in selected_cols:
+			log_lines.append(f"  {col}")
 		log_lines.append("")
 
 		try:
@@ -138,11 +176,11 @@ class TranslationMergeApp:
 				self.translation_files,
 				selected_cols
 			)
-			if result is None:
+			if result is None or len(result) < 3:
 				self.status_label.config(text="Error: Merge failed or file could not be loaded.")
 				print("[GUI LOG] merge_translations returned None. Merge failed or file could not be loaded.")
 				return
-			merged_df, merge_stats = result
+			merged_df, merge_stats, col_mismatch_stats = result
 
 			self.status_label.config(text="Step 3: Counting missing rows...")
 			# Count rows not found in translation files
@@ -172,7 +210,17 @@ class TranslationMergeApp:
 				log_lines.append(f"Number of rows not found in translation files (by Respondent.Serial): {not_found}")
 				log_lines.append("")
 				log_lines.append(f"Path to the saved merged file: {save_path}")
-				# Add per-country, per-column merge stats
+				# Add column mismatches before per-country stats
+				log_lines.append("")
+				log_lines.append("--- Column mismatches (columns missing in translation files) ---")
+				if col_mismatch_stats:
+					for country, missing_cols in col_mismatch_stats.items():
+						log_lines.append(f"{country}:")
+						for col in missing_cols:
+							log_lines.append(f"  {col}")
+						log_lines.append("")
+				else:
+					log_lines.append("None. All columns matched in all translation files.")
 				log_lines.append("")
 				log_lines.append("--- Per-country, per-column merge stats ---")
 				for country, col_stats in merge_stats.items():
