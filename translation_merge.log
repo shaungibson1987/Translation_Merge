@@ -1,0 +1,11 @@
+
+--- Translation Merge Run ---
+Start time: 2025-09-07 09:39:05
+Main file: C:/Users/sgibson/DataExtractQC/Data/P027822/output2/P027822__Overall.xlsx
+Translation files: C:/Users/sgibson/DataExtractQC/Data/P027822/output2\P027822__DEU_translated.xlsx
+Number of translation files: 1
+Columns merged: outro
+End time: 2025-09-07 09:39:30
+Run time (seconds): 24.92
+Rows not found in translation files: 10025
+Saved merged file: C:/Users/sgibson/DataExtractQC/Data/P027822/output2/Overall_with_English2.xlsx
