@@ -31,6 +31,10 @@ class TranslationMergeApp:
 		self.trans_files_list_label = ttk.Label(frame, text="")
 		self.trans_files_list_label.pack(anchor=tk.W)
 
+		# Status label
+		self.status_label = ttk.Label(frame, text="Ready.", foreground="blue")
+		self.status_label.pack(anchor=tk.W, pady=(10,0))
+
 
 		# Columns checklist with scrollbar
 		columns_frame_outer = ttk.LabelFrame(frame, text="Columns to Merge", padding=5)
@@ -100,6 +104,7 @@ class TranslationMergeApp:
 		self.column_vars = []
 
 	def merge_and_save(self):
+		self.status_label.config(text="Step 1: Loading main Excel file...")
 		selected_cols = [col for var, col in self.column_vars if var.get()]
 		if not selected_cols:
 			messagebox.showwarning("No Columns Selected", "Please select at least one column to merge.")
@@ -125,16 +130,21 @@ class TranslationMergeApp:
 		log_lines.append("")
 
 		try:
+			self.status_label.config(text="Step 2: Merging translations...")
 			print(f"[GUI LOG] Calling merge_translations with main_file={self.main_file}, translation_files={self.translation_files}, selected_cols={selected_cols}")
-			merged_df = merge_core.merge_translations(
+
+			result = merge_core.merge_translations(
 				self.main_file,
 				self.translation_files,
 				selected_cols
 			)
-			if merged_df is None:
+			if result is None:
+				self.status_label.config(text="Error: Merge failed or file could not be loaded.")
 				print("[GUI LOG] merge_translations returned None. Merge failed or file could not be loaded.")
 				return
+			merged_df, merge_stats = result
 
+			self.status_label.config(text="Step 3: Counting missing rows...")
 			# Count rows not found in translation files
 			not_found = 0
 			id_column = 'Respondent.Serial'
@@ -143,11 +153,15 @@ class TranslationMergeApp:
 				if new_col in merged_df.columns:
 					not_found += merged_df[new_col].isna().sum() + (merged_df[new_col] == '').sum()
 
+			self.status_label.config(text="Step 4: Saving merged Excel file...")
+			# Generate default output filename: originalfilename_Merged.xlsx
+			base_name = os.path.splitext(os.path.basename(self.main_file))[0]
+			default_output = f"{base_name}_Merged.xlsx"
 			save_path = filedialog.asksaveasfilename(
 				title="Save Merged Excel File",
 				defaultextension=".xlsx",
 				filetypes=[("Excel files", "*.xlsx")],
-				initialfile="Overall_with_English.xlsx"
+				initialfile=default_output
 			)
 			if save_path:
 				merge_core.save_merged_excel(merged_df, save_path)
@@ -158,13 +172,25 @@ class TranslationMergeApp:
 				log_lines.append(f"Number of rows not found in translation files (by Respondent.Serial): {not_found}")
 				log_lines.append("")
 				log_lines.append(f"Path to the saved merged file: {save_path}")
-				# Write log to the same directory as the saved Excel file
-				log_path = os.path.join(os.path.dirname(save_path), "translation_merge.log")
+				# Add per-country, per-column merge stats
+				log_lines.append("")
+				log_lines.append("--- Per-country, per-column merge stats ---")
+				for country, col_stats in merge_stats.items():
+					log_lines.append(f"{country}")
+					for col, count in col_stats.items():
+						log_lines.append(f"  {col} - {count} non blank cells merged")
+					log_lines.append("")
+				# Write log to the same directory as the saved Excel file, as .txt
+				log_path = os.path.join(os.path.dirname(save_path), "translation_merge.txt")
 				with open(log_path, "a", encoding="utf-8") as f:
 					for line in log_lines:
 						f.write(line + "\n")
+				self.status_label.config(text="Done! Merged file saved.")
 				messagebox.showinfo("Success", f"Merged file saved to:\n{save_path}\nLog saved to:\n{log_path}")
+			else:
+				self.status_label.config(text="Save cancelled.")
 		except Exception as e:
+			self.status_label.config(text=f"Error: {e}")
 			if 'log_path' in locals():
 				with open(log_path, "a", encoding="utf-8") as f:
 					f.write(f"Error: {e}\n")
