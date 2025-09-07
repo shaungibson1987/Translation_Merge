@@ -1,4 +1,3 @@
-
 # Translation Merge Tool
 
 A user-friendly Python GUI tool to merge English translations from multiple survey data files into a main survey file. Designed for survey researchers and analysts who need to combine open-ended or comment translations from several sources into a single, easy-to-review Excel file.
@@ -96,3 +95,13 @@ Pull requests and suggestions are welcome! Please open an issue for any bugs or 
 - Diagnostics: The merge process logs ID and column overlap, and sample merged values, to help debug any issues.
 - .gitignore updated to exclude all .xlsx files for data privacy.
 - GUI and core logic are now robust to missing/invalid files and columns.
+
+---
+
+## New Feature: Rename Columns in Translation Files by Order
+
+- **Tick Box Option:** The GUI now includes a checkbox labeled "Rename columns in translation files by order (force match)".
+- **What it does:** If checked, before merging, the app will rename the columns in each translation file to match the main file's columns by order (left to right).
+- **Safety:** A confirmation popup will warn you before proceeding. The app creates a backup of each translation file in a new `backups` folder before making any changes.
+- **When to use:** Only use this option if you are sure the translation files have the same column order as the main file. This prevents issues caused by column names being translated (e.g., by Google Translate).
+- **Warning:** If the column order does not match, data may be misaligned. Always check your backups if unsure.
