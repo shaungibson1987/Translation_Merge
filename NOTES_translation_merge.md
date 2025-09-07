@@ -44,7 +44,9 @@ Create a user-friendly GUI tool to merge English translations from multiple tran
 - **Core Logic (merge_core.py):**
   - Load the overall file and all *_translated* files
   - For each selected column, create a new column `<col>_ENG_Trans`
-  - For each Respondent.Serial, merge in the first available translation from any file
+  - For each Respondent.Serial, merge in the translation from any file (all translation files are combined; if multiple files have a value, the last file's value is used)
+  - Full error handling: any error in file loading or merging is logged and handled gracefully
+  - Detailed diagnostics: logs overlap of respondent IDs, column matches, and sample merged values for transparency
   - Save the merged result as a new Excel file
 
 - **Naming Conventions:**
@@ -53,8 +55,9 @@ Create a user-friendly GUI tool to merge English translations from multiple tran
 
 - **Edge Cases:**
   - If a respondent is missing in a translation file, leave the new column blank for that row
-  - If multiple translation files have a value, use the first non-empty value
+  - If multiple translation files have a value for the same respondent/column, the last file’s value is used (overrides previous)
   - If a column is not found in a translation file, skip it for that file
+  - If a translation file cannot be loaded, it is skipped and an error is logged
 
 ## Example Scenario
 - Main file: `AllData_Overall.xlsx`
